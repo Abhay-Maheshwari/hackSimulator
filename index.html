@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="terminal">
+        <span id="code-output"></span><span class="cursor"></span>
+    </div>
+
+    <div id="command-line" class="hidden">
+        <span class="prompt">></span>
+        <input type="text" id="cmd-input" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div id="status-bar">
+        <span>CPU: <span id="cpu-val">12%</span></span>
+        <span>RAM: <span id="ram-val">4.2GB</span></span>
+        <span>NET: <span class="status-ok">CONNECTED</span></span>
+        <span>IP: 192.168.0.1</span>
+        <div class="controls">
+            <select id="code-select" title="Select Code Base">
+                <option value="kernel">Kernel C</option>
+                <option value="html">HTML 5</option>
+                <option value="matrix">Matrix</option>
+            </select>
+            <button id="auto-hack-btn" title="Auto Hack Mode">🤖</button>
+            <input type="range" id="speed-slider" min="1" max="50" value="5" title="Typing Speed">
+            <button id="fullscreen-btn" title="Toggle Fullscreen">⛶</button>
+            <button id="settings-btn" title="Settings">⚙️</button>
+        </div>
+    </div>
+
+    <div id="settings-panel" class="hidden">
+        <h3>THEME SELECTOR</h3>
+        <div class="theme-options">
+            <button class="theme-btn" data-set-theme="green">CLASSIC</button>
+            <button class="theme-btn" data-set-theme="amber">AMBER</button>
+            <button class="theme-btn" data-set-theme="matrix">MATRIX</button>
+            <button class="theme-btn" data-set-theme="cyberpunk">CYBERPUNK</button>
+        </div>
+        <button id="close-settings">CLOSE</button>
+    </div>
+
+    <div id="access-granted" class="popup granted">ACCESS GRANTED</div>
+    <div id="access-denied" class="popup denied">ACCESS DENIED</div>
+    <div id="processing" class="popup processing">AUTHENTICATING...</div>
+
+    <div class="mobile-hint">Mobile Apps </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

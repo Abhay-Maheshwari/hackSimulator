@@ -2,6 +2,14 @@
 const CHARS_PER_KEYPRESS = 1;
 const SCROLL_SPEED = 100;
 
+const THEMES = ['green', 'amber', 'matrix', 'cyberpunk'];
+const STORAGE = {
+    theme: 'hackSim_theme',
+    speed: 'hackSim_speed',
+    mute: 'hackSim_mute',
+    code: 'hackSim_code',
+};
+
 // State
 let codeIndex = 0;
 let accessGrantedCount = 0;
@@ -14,17 +22,23 @@ const codeOutput = document.getElementById('code-output');
 const accessGrantedPopup = document.getElementById('access-granted');
 const accessDeniedPopup = document.getElementById('access-denied');
 const processingPopup = document.getElementById('processing');
+const muteBtn = document.getElementById('mute-btn');
+const codeSelect = document.getElementById('code-select');
 
 // Sound Manager using Web Audio API
 class SoundManager {
     constructor() {
         this.context = new (window.AudioContext || window.webkitAudioContext)();
         this.masterGain = this.context.createGain();
-        this.masterGain.gain.value = 1; // Volume control
+        this.masterGain.gain.value = 1;
         this.masterGain.connect(this.context.destination);
+        this.muted = false;
     }
 
     playTone(freq, type, duration) {
+        if (this.muted) {
+            return;
+        }
         if (this.context.state === 'suspended') {
             this.context.resume();
         }
@@ -45,25 +59,124 @@ class SoundManager {
     }
 
     playTypingSound() {
-        // Short, high-pitched click
         this.playTone(800 + Math.random() * 200, 'square', 0.05);
     }
 
     playAccessGranted() {
-        // Success chime (major triad arpeggio)
-        this.playTone(440, 'sine', 0.2); // A4
-        setTimeout(() => this.playTone(554, 'sine', 0.2), 100); // C#5
-        setTimeout(() => this.playTone(659, 'sine', 0.4), 200); // E5
+        this.playTone(440, 'sine', 0.2);
+        setTimeout(() => this.playTone(554, 'sine', 0.2), 100);
+        setTimeout(() => this.playTone(659, 'sine', 0.4), 200);
     }
 
     playAccessDenied() {
-        // Error buzzer (low saw waves)
         this.playTone(150, 'sawtooth', 0.3);
         setTimeout(() => this.playTone(100, 'sawtooth', 0.4), 150);
     }
 }
 
 const soundManager = new SoundManager();
+
+function setTheme(theme, { playSound = false } = {}) {
+    if (!THEMES.includes(theme)) {
+        return false;
+    }
+    if (theme === 'green') {
+        document.body.removeAttribute('data-theme');
+    } else {
+        document.body.setAttribute('data-theme', theme);
+    }
+    try {
+        localStorage.setItem(STORAGE.theme, theme);
+    } catch (_) {
+        /* ignore quota / private mode */
+    }
+    if (playSound) {
+        soundManager.playTypingSound();
+    }
+    return true;
+}
+
+function getStoredTheme() {
+    try {
+        const t = localStorage.getItem(STORAGE.theme);
+        if (THEMES.includes(t)) {
+            return t;
+        }
+    } catch (_) {
+        /* ignore */
+    }
+    return 'green';
+}
+
+function applyCodeBase(key, silent) {
+    const k = ['kernel', 'html', 'matrix'].includes(key) ? key : 'kernel';
+    if (codeSelect) {
+        codeSelect.value = k;
+    }
+    if (k === 'kernel') {
+        codeData = kernelCode;
+    } else if (k === 'html') {
+        codeData = htmlCode;
+    } else {
+        codeData = matrixCode;
+    }
+    try {
+        localStorage.setItem(STORAGE.code, k);
+    } catch (_) {
+        /* ignore */
+    }
+    if (!silent) {
+        codeIndex = 0;
+        codeOutput.textContent += '\n--- SYSTEM SWITCH ---\n';
+    }
+}
+
+function updateMuteButton() {
+    if (!muteBtn) {
+        return;
+    }
+    muteBtn.textContent = soundManager.muted ? '🔇' : '🔊';
+    muteBtn.title = soundManager.muted ? 'Unmute sound' : 'Mute sound';
+    muteBtn.classList.toggle('muted', soundManager.muted);
+}
+
+function persistSpeed() {
+    if (!speedSlider) {
+        return;
+    }
+    try {
+        localStorage.setItem(STORAGE.speed, speedSlider.value);
+    } catch (_) {
+        /* ignore */
+    }
+}
+
+function loadPreferences() {
+    setTheme(getStoredTheme());
+    if (speedSlider) {
+        try {
+            const s = parseInt(localStorage.getItem(STORAGE.speed), 10);
+            if (s >= 1 && s <= 50) {
+                speedSlider.value = String(s);
+            }
+        } catch (_) {
+            /* ignore */
+        }
+    }
+    try {
+        soundManager.muted = localStorage.getItem(STORAGE.mute) === '1';
+    } catch (_) {
+        /* ignore */
+    }
+    let storedCode = 'kernel';
+    try {
+        storedCode = localStorage.getItem(STORAGE.code) || 'kernel';
+    } catch (_) {
+        /* ignore */
+    }
+    applyCodeBase(storedCode, true);
+    updateMuteButton();
+}
 
 // Main Typing Logic
 function typeCode() {
@@ -74,7 +187,6 @@ function typeCode() {
         codeOutput.textContent += nextChunk;
         codeIndex += chunkSize;
 
-        // Loop code if we reach the end
         if (codeIndex >= codeData.length) {
             codeIndex = 0;
         }
@@ -139,16 +251,10 @@ if (closeSettingsBtn) {
     });
 }
 
-themeBtns.forEach(btn => {
+themeBtns.forEach((btn) => {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const theme = btn.dataset.setTheme;
-        if (theme === 'green') {
-            document.body.removeAttribute('data-theme');
-        } else {
-            document.body.setAttribute('data-theme', theme);
-        }
-        soundManager.playTypingSound();
+        setTheme(btn.dataset.setTheme, { playSound: true });
     });
 });
 
@@ -169,11 +275,13 @@ function toggleAutoHack() {
 }
 
 function startAutoHack() {
-    if (autoTypingInterval) clearInterval(autoTypingInterval);
-    const speed = 51 - speedSlider.value; // Invert: higher value = faster (lower interval)
+    if (autoTypingInterval) {
+        clearInterval(autoTypingInterval);
+    }
+    const speed = 51 - speedSlider.value;
     autoTypingInterval = setInterval(() => {
         typeCode();
-    }, speed * 5); // Scale factor
+    }, speed * 5);
 }
 
 if (autoHackBtn) {
@@ -186,33 +294,35 @@ if (autoHackBtn) {
 if (speedSlider) {
     speedSlider.addEventListener('input', (e) => {
         e.stopPropagation();
+        persistSpeed();
         if (autoTypingInterval) {
-            startAutoHack(); // Restart with new speed
+            startAutoHack();
         }
     });
-    // Prevent typing when dragging slider
     speedSlider.addEventListener('click', (e) => e.stopPropagation());
     speedSlider.addEventListener('mousedown', (e) => e.stopPropagation());
     speedSlider.addEventListener('touchstart', (e) => e.stopPropagation());
 }
 
+if (muteBtn) {
+    muteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        soundManager.muted = !soundManager.muted;
+        try {
+            localStorage.setItem(STORAGE.mute, soundManager.muted ? '1' : '0');
+        } catch (_) {
+            /* ignore */
+        }
+        updateMuteButton();
+    });
+}
+
 // Code Selection Logic
-const codeSelect = document.getElementById('code-select');
 if (codeSelect) {
     codeSelect.addEventListener('change', (e) => {
         e.stopPropagation();
-        const selected = e.target.value;
-        if (selected === 'kernel') {
-            codeData = kernelCode;
-        } else if (selected === 'html') {
-            codeData = htmlCode;
-        } else if (selected === 'matrix') {
-            codeData = matrixCode;
-        }
-        codeIndex = 0; // Reset typing
-        codeOutput.textContent += "\n--- SYSTEM SWITCH ---\n";
+        applyCodeBase(e.target.value, false);
     });
-    // Prevent typing when clicking select
     codeSelect.addEventListener('click', (e) => e.stopPropagation());
     codeSelect.addEventListener('mousedown', (e) => e.stopPropagation());
 }
@@ -223,10 +333,8 @@ if (fullscreenBtn) {
         e.stopPropagation();
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+        } else if (document.exitFullscreen) {
+            document.exitFullscreen();
         }
     });
 }
@@ -242,7 +350,7 @@ function toggleCommandLine() {
     } else {
         commandLine.classList.add('hidden');
         cmdInput.value = '';
-        terminal.scrollTop = terminal.scrollHeight; // Scroll back to bottom
+        terminal.scrollTop = terminal.scrollHeight;
     }
 }
 
@@ -255,42 +363,55 @@ function executeCommand(cmd) {
 
     switch (command) {
         case '/help':
-            codeOutput.textContent += "Available commands:\n  /help - Show this help\n  /clear - Clear terminal\n  /theme [green|amber|matrix|cyberpunk] - Set theme\n  /speed [1-50] - Set auto-type speed\n";
+            codeOutput.textContent +=
+                'Available commands:\n' +
+                '  /help - Show this help\n' +
+                '  /clear - Clear terminal\n' +
+                '  /theme [green|amber|matrix|cyberpunk] - Set theme (saved)\n' +
+                '  /speed [1-50] - Set auto-type speed (saved)\n' +
+                '  /mute - Toggle sound (saved)\n';
             break;
         case '/clear':
-            codeOutput.textContent = "";
+            codeOutput.textContent = '';
             codeIndex = 0;
             break;
         case '/theme':
             if (args.length > 0) {
-                const theme = args[0];
-                if (['green', 'amber', 'matrix', 'cyberpunk'].includes(theme)) {
-                    if (theme === 'green') {
-                        document.body.removeAttribute('data-theme');
-                    } else {
-                        document.body.setAttribute('data-theme', theme);
-                    }
-                    codeOutput.textContent += `Theme set to ${theme}\n`;
+                if (setTheme(args[0], { playSound: true })) {
+                    codeOutput.textContent += `Theme set to ${args[0]}\n`;
                 } else {
-                    codeOutput.textContent += `Unknown theme: ${theme}\n`;
+                    codeOutput.textContent += `Unknown theme: ${args[0]}\n`;
                 }
             } else {
-                codeOutput.textContent += "Usage: /theme [green|amber|matrix|cyberpunk]\n";
+                codeOutput.textContent += 'Usage: /theme [green|amber|matrix|cyberpunk]\n';
             }
             break;
         case '/speed':
             if (args.length > 0) {
-                const speed = parseInt(args[0]);
+                const speed = parseInt(args[0], 10);
                 if (speed >= 1 && speed <= 50) {
-                    speedSlider.value = speed;
-                    if (autoTypingInterval) startAutoHack();
+                    speedSlider.value = String(speed);
+                    persistSpeed();
+                    if (autoTypingInterval) {
+                        startAutoHack();
+                    }
                     codeOutput.textContent += `Speed set to ${speed}\n`;
                 } else {
-                    codeOutput.textContent += "Speed must be between 1 and 50\n";
+                    codeOutput.textContent += 'Speed must be between 1 and 50\n';
                 }
             } else {
-                codeOutput.textContent += "Usage: /speed [1-50]\n";
+                codeOutput.textContent += 'Usage: /speed [1-50]\n';
             }
+            break;
+        case '/mute':
+            soundManager.muted = !soundManager.muted;
+            try {
+                localStorage.setItem(STORAGE.mute, soundManager.muted ? '1' : '0');
+            } catch (_) {
+                /* ignore */
+            }
+            updateMuteButton();
+            codeOutput.textContent += soundManager.muted ? 'Sound muted\n' : 'Sound on\n';
             break;
         default:
             codeOutput.textContent += `Unknown command: ${command}\n`;
@@ -301,7 +422,7 @@ function executeCommand(cmd) {
 
 if (cmdInput) {
     cmdInput.addEventListener('keydown', (e) => {
-        e.stopPropagation(); // Prevent main typing
+        e.stopPropagation();
         if (e.key === 'Enter') {
             executeCommand(cmdInput.value);
         }
@@ -311,20 +432,26 @@ if (cmdInput) {
     });
 }
 
+function isChromeUiTarget(el) {
+    return (
+        el.closest('#status-bar') ||
+        el.closest('#settings-panel') ||
+        el.closest('#command-line')
+    );
+}
+
 // Event Listeners
 document.addEventListener('keydown', (e) => {
     if (soundManager.context.state === 'suspended') {
         soundManager.context.resume();
     }
 
-    // Toggle Command Line with Tilde (~) or Backtick (`)
     if (e.key === '`' || e.key === '~') {
         e.preventDefault();
         toggleCommandLine();
         return;
     }
 
-    // If command line is open, don't type code
     if (!commandLine.classList.contains('hidden')) {
         return;
     }
@@ -358,31 +485,31 @@ document.addEventListener('keydown', (e) => {
     typeCode();
 });
 
-document.addEventListener('touchstart', (e) => {
-    if (soundManager.context.state === 'suspended') {
-        soundManager.context.resume();
-    }
-    if (e.target !== terminal) {
-        // Allow clicking buttons without typing
-        if (e.target.tagName === 'BUTTON' || e.target.closest('#settings-panel')) {
+document.addEventListener(
+    'touchstart',
+    (e) => {
+        if (soundManager.context.state === 'suspended') {
+            soundManager.context.resume();
+        }
+        if (isChromeUiTarget(e.target)) {
             return;
         }
-        e.preventDefault();
-    }
-    typeCode();
-}, { passive: false });
+        if (!terminal.contains(e.target)) {
+            e.preventDefault();
+        }
+        typeCode();
+    },
+    { passive: false }
+);
 
 document.addEventListener('click', (e) => {
     if (soundManager.context.state === 'suspended') {
         soundManager.context.resume();
     }
-    // Don't type if clicking UI elements
-    if (e.target.tagName === 'BUTTON' || e.target.closest('#settings-panel')) {
+    if (isChromeUiTarget(e.target)) {
         return;
     }
     typeCode();
 });
 
-window.onload = () => {
-    // Initial setup if needed
-};
+loadPreferences();

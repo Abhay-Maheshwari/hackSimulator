@@ -4,14 +4,20 @@
     --font-family: 'Courier New', Courier, monospace;
     --font-size: 18px;
     --glow-color: rgba(0, 255, 65, 0.5);
-    --bar-bg: #00ff41;
-    --bar-text: #0d0208;
+    /* Dark bar + accent text matches terminal; avoids full-width neon strip */
+    --bar-bg: #0a160c;
+    --bar-text: #00ff41;
+    --bar-border: rgba(0, 255, 65, 0.35);
 }
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+}
+
+html {
+    color-scheme: dark;
 }
 
 body {
@@ -244,18 +250,53 @@ body::after {
 #status-bar {
     background-color: var(--bar-bg);
     color: var(--bar-text);
-    padding: 5px 10px;
+    border-top: 1px solid var(--bar-border, rgba(0, 255, 65, 0.35));
+    padding: 6px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
     z-index: 20;
     /* Ensure above everything */
     position: relative;
 }
 
+.status-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+}
+
+.status-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+}
+
+.shortcut-hint {
+    margin: 0;
+    font-size: 0.65em;
+    line-height: 1.3;
+    opacity: 0.72;
+    font-family: var(--font-family);
+}
+
+.shortcut-hint kbd {
+    display: inline-block;
+    padding: 0 0.25em;
+    border: 1px solid var(--bar-border, var(--bar-text));
+    border-radius: 2px;
+    font-size: 0.95em;
+    opacity: 0.95;
+}
+
 .status-ok {
-    background-color: var(--bar-text);
-    color: var(--bar-bg);
+    background-color: var(--text-color);
+    color: var(--bg-color);
     font-weight: bold;
     padding: 0 5px;
     border-radius: 2px;
@@ -266,6 +307,7 @@ body::after {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-shrink: 0;
     z-index: 20;
     /* Ensure above everything */
     position: relative;
@@ -273,7 +315,8 @@ body::after {
 
 #settings-btn,
 #fullscreen-btn,
-#auto-hack-btn {
+#auto-hack-btn,
+#mute-btn {
     background: none;
     border: none;
     color: var(--bar-text);
@@ -285,13 +328,28 @@ body::after {
 
 #settings-btn:hover,
 #fullscreen-btn:hover,
-#auto-hack-btn:hover {
+#auto-hack-btn:hover,
+#mute-btn:hover {
     transform: scale(1.2);
+}
+
+#settings-btn:focus-visible,
+#fullscreen-btn:focus-visible,
+#auto-hack-btn:focus-visible,
+#mute-btn:focus-visible,
+.theme-btn:focus-visible,
+#close-settings:focus-visible {
+    outline: 2px solid var(--bar-text);
+    outline-offset: 2px;
 }
 
 #auto-hack-btn.active {
     text-shadow: 0 0 10px var(--bar-text);
     transform: scale(1.1);
+}
+
+#mute-btn.muted {
+    opacity: 0.55;
 }
 
 #speed-slider {
@@ -301,13 +359,19 @@ body::after {
 }
 
 #code-select {
-    background: var(--bg-color);
+    background: var(--bar-bg);
     color: var(--bar-text);
-    border: 1px solid var(--bar-text);
+    border: 1px solid var(--bar-border, var(--bar-text));
     font-family: var(--font-family);
     font-size: 0.8em;
-    padding: 2px;
+    padding: 2px 6px;
     cursor: pointer;
+    border-radius: 2px;
+}
+
+#code-select option {
+    background: var(--bg-color);
+    color: var(--text-color);
 }
 
 /* Settings Panel */
@@ -407,25 +471,58 @@ body::after {
     outline: none;
 }
 
+#cmd-input:focus-visible {
+    outline: 1px dashed var(--text-color);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    body::after {
+        animation: none;
+        opacity: 0;
+    }
+
+    .cursor {
+        animation: none;
+        opacity: 1;
+    }
+
+    .popup.processing {
+        animation: none;
+    }
+
+    #settings-btn,
+    #fullscreen-btn,
+    #auto-hack-btn,
+    #mute-btn {
+        transition: none;
+    }
+}
+
 /* Themes */
 [data-theme="amber"] {
     --text-color: #ffb000;
-    --bar-bg: #ffb000;
+    --bar-bg: #1a1205;
+    --bar-text: #ffb000;
+    --bar-border: rgba(255, 176, 0, 0.4);
     --glow-color: rgba(255, 176, 0, 0.5);
 }
 
 [data-theme="matrix"] {
     --text-color: #00ff41;
     --bg-color: #000000;
-    --bar-bg: #003b00;
+    --bar-bg: #031a08;
     --bar-text: #00ff41;
+    --bar-border: rgba(0, 255, 65, 0.35);
     --font-family: 'Courier New', Courier, monospace;
 }
 
 [data-theme="cyberpunk"] {
     --text-color: #00f3ff;
     --bg-color: #0d0221;
-    --bar-bg: #ff0055;
+    --bar-bg: #14082a;
+    --bar-text: #00f3ff;
+    --bar-border: rgba(0, 243, 255, 0.35);
     --glow-color: rgba(0, 243, 255, 0.5);
-    --bar-text: #ffffff;
 }
